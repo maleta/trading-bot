@@ -1,7 +1,8 @@
 ## trading bot
 Start bot by running following command
 ````
-    npm run dev
+npm install
+npm run dev
 ````
 Available routes:
 ````
