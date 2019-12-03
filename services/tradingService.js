@@ -47,7 +47,7 @@ var setData = function(result) {
 
     checkOpenPositions()
       .then(function() {
-
+        // open new positions if appropriate
       })
 
   }
