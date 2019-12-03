@@ -2,7 +2,9 @@ const cfg = require('../config').config()
 
 exports.assets = {
   first: 0,
-  second: cfg.startingBalance
+  second: cfg.startingBalance,
+  firstMustKeepToClosePositions: 0,
+  secondMustKeepToClosePositions: 0
 }
 exports.latestResult = {
   bidPrice: 0,

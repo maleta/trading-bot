@@ -17,8 +17,9 @@ app.use('/status', function(req, res) {
   let helper = {}
   helper[cfg.first] = data.assets.first
   helper[cfg.second] = data.assets.second
+  console.log(data.PnL)
   res.status(200).send({
-    pnl: data.PnL, 
+    pnl: JSON.stringify([...data.PnL]), 
     assets: helper
   });
 })
@@ -27,7 +28,7 @@ app.use('/stop', function(req, res) {
   res.status(200).send({
     statusMessage: 'bot activites stopped',
     assets: data.assets,
-    PnL: data.PnL
+    PnL: JSON.stringify([...data.PnL])
   })
 })
 

@@ -21,10 +21,23 @@ var position = function(type, amountStart, priceStart, amountEnd, priceEnd, asse
 }
 
 var checkOpenPositions = function() {
+  console.log('checking new posiotions')
   return new Promise(function(resolve, reject) {
-    data.PnL.forEach((item) => {
-      // if (item)
-    })
+    data.PnL.forEach((item, index) => {
+      if (item.status === 'open') { //optimize by having 2 different position maps, 1st for opened and 2nd for closed positions 
+        if (item.type === 'buy') {
+          if ((data.latestResult.askPrice - item.priceStart) >= config.buyGainStop) {
+            sellFor(data.latestResult.askPrice, item.amountStart, index);
+          }
+        }
+        else { // sell position
+          if ((data.latestResult.bidPrice - item.priceStart) >= config.sellGainStop) {
+            buyFor(data.latestResult.bidPrice, item.amountStart, index);
+          }
+        }
+      }
+    });
+    resolve(); // Promise would be needed if we actually call AJAX and create orders in this function(or in sellFor, buyFor functions)
   })
 }
 
@@ -47,47 +60,66 @@ var setData = function(result) {
 
     checkOpenPositions()
       .then(function() {
-        // open new positions if appropriate
+        let extraFirstFunds = data.assets.first - data.firstMustKeepToClosePositions;
+
+        if (extraFirstFunds > 0) {
+          sellFor(extraFirstFunds, data.latestResult.bidPrice)
+        }
+
+        let extraSecondFunds = data.assets.second - data.secondMustKeepToClosePositions;
+        if (extraSecondFunds > 0) {
+          buyFor(extraSecondFunds, data.latestResult.askPrice)
+        }
       })
 
   }
   else {
-    // ignore, no price changes in this check
+    // no price changes in this check, ignore
   }
 }
 
-var buyFor = function(amount, price, positionId) {
+var buyFor = function(amount, price, positionId) { //amount is in second asset (USD)
   console.log('buying ' + config.first + ' ' + amount + ' price ' + config.second + ' ' + price)
-  data.assets.first = numberRounding(amount /  data.latestResult.askPrice) // no exchange fee calculus
-  data.assets.second = data.assets.second - amount
+  let firstChange = numberRounding(amount / data.latestResult.askPrice);
+  data.assets.first += firstChange // no exchange fee calculus
+  data.assets.second -= amount
   if (positionId) {
     let pos = data.PnL.get(positionId);
     pos.status = 'close';
     pos.amountEnd = amount;
     pos.priceEnd = price;
-    pos.difference = pos.amountStart * pos.amountEnd - pos.amountEnd * pos.priceEnd; // buy close is positive for gain, negative for loss
+    pos.difference = pos.amountStart * pos.priceStart - pos.amountEnd * pos.priceEnd; // buy close is positive for gain, negative for loss
     data.PnL.set(positionId, pos)
+    data.assets.firstMustKeepToClosePositions -= firstChange
   }
   else {
-    let pos = new position('buy', amount, price, 0, 0, config.first );
-    data.PnL.set(Math.random().toString(36).substr(2, 9), pos);
+    let pos = new position('buy', amount, price, 0, 0, config.first )
+    data.PnL.set(Math.random().toString(36).substr(2, 9), pos)
+    console.log('seeting new pnl')
+    console.log(data.PnL);
+    data.assets.firstMustKeepToClosePositions += firstChange
   }
 }
-var sellFor = function(amount, price, positionId) {
+var sellFor = function(amount, price, positionId) { // amount is in first asset (BTC)
   console.log('selling '+ config.first + ' ' + amount + ' price ' + config.second + ' ' + price)
-  data.assets.first = data.assets.first - amount // no exchange fee calculus
-  data.assets.second = data.assets.second + numberRounding(amount * price)
+  let secondChange = numberRounding(amount * price)
+  data.assets.first -= amount // no exchange fee calculus
+  data.assets.second += secondChange
   if (positionId) {
-    let pos = data.PnL.get(positionId);
+    let pos = data.PnL.get(positionId)
     pos.status = 'close';
     pos.amountEnd = amount;
     pos.priceEnd = price;
-    pos.difference = pos.amountEnd * pos.priceEnd - pos.amountStart * pos.amountEnd; // sell close is positive for gain, negative for loss
+    pos.difference = pos.amountEnd * pos.priceEnd - pos.amountStart * pos.priceStart; // sell close is positive for gain, negative for loss
     data.PnL.set(positionId, pos)
+    data.assets.secondMustKeepToClosePositions -= secondChange
   }
   else {
-    let pos = new position('sell', amount, price, 0, 0, config.first );
-    data.PnL.set(Math.random().toString(36).substr(2, 9), pos);
+    let pos = new position('sell', amount, price, 0, 0, config.first )
+    data.PnL.set(Math.random().toString(36).substr(2, 9), pos)
+    console.log('seeting new pnl')
+    console.log(data.PnL);
+    data.assets.secondMustKeepToClosePositions += secondChange
   }
 }
 
