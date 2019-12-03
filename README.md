@@ -13,4 +13,6 @@ Available routes:
 TODO
 1. Add logic to determine what loss to accept and close position before catastrophic loss
 2. Put fee calculus in formulas
-3. Add more tactics for trading
+3. Add live info on frontend using socketIO
+4. Implement stop custom position and stop all positions functionallity
+5. Add more tactics for trading
