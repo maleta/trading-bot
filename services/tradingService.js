@@ -15,6 +15,7 @@ var position = function(type, amountStart, priceStart, amountEnd, priceEnd, asse
     priceStart: priceStart,
     amountEnd: amountEnd,
     priceEnd: priceEnd,
+    effectiveAmount: 0, // qty of BTC when buy position, qty of USD when sell position
     asset: asset,
     difference: 0, // + for gain, - for loss
   }
@@ -25,15 +26,15 @@ var checkOpenPositions = function() {
     data.PnL.forEach((item, index) => {
       if (item.status === 'open') { //optimize by having 2 different position maps, 1st for opened and 2nd for closed positions 
         if (item.type === 'buy') {
-          console.log(`checking ${index} as buy ${data.latestResult.askPrice - item.priceStart}`)
-          if ((data.latestResult.askPrice - item.priceStart) >= config.buyGainStop) {
-            sellFor(item.amountStart, data.latestResult.askPrice, index);
+          console.log(`checking ${index} buy position if there is gain if we sell now ${data.latestResult.bidPrice - item.priceStart}`)
+          if ((data.latestResult.bidPrice - item.priceStart) >= config.buyGainStop) {
+            sellFor(item.effectiveAmount, data.latestResult.bidPrice, index);
           }
         }
         else { // sell position
-          console.log(`checking ${index} as sell ${data.latestResult.bidPrice - item.priceStart}`)
-          if ((data.latestResult.bidPrice - item.priceStart) >= config.sellGainStop) {
-            buyFor(item.amountStart, data.latestResult.bidPrice, index);
+          console.log(`checking ${index} sell position if there is gain if we buy now ${item.priceStart - data.latestResult.askPrice}`)
+          if ((item.priceStart - data.latestResult.askPrice) >= config.sellGainStop) {
+            buyFor(item.effectiveAmount, data.latestResult.askPrice, index);
           }
         }
       }
@@ -61,14 +62,12 @@ var setData = function(result) {
 
     checkOpenPositions()
       .then(function() {
-        let extraFirstFunds = data.assets.first - data.assets.firstMustKeepToClosePositions;
-        console.log('e1', extraFirstFunds)
+        let extraFirstFunds = numberRounding(data.assets.first - data.assets.firstMustKeepToClosePositions)
         if (extraFirstFunds > 0) {
           sellFor(extraFirstFunds, data.latestResult.bidPrice)
         }
 
-        let extraSecondFunds = data.assets.second - data.assets.secondMustKeepToClosePositions;
-        console.log('e2', extraSecondFunds)
+        let extraSecondFunds = numberRounding(data.assets.second - data.assets.secondMustKeepToClosePositions)
         if (extraSecondFunds > 0) {
           buyFor(extraSecondFunds, data.latestResult.askPrice)
         }
@@ -81,44 +80,53 @@ var setData = function(result) {
 }
 
 var buyFor = function(amount, price, positionId) { //amount is in second asset (USD)
-  console.log('buying ' + config.first + ' ' + amount + ' price ' + config.second + ' ' + price)
   let firstChange = numberRounding(amount / price);
   data.assets.first += firstChange // no exchange fee calculus
   data.assets.second -= amount
+
   if (positionId) {
     let pos = data.PnL.get(positionId);
-    pos.status = 'close';
-    pos.amountEnd = amount;
-    pos.priceEnd = price;
-    pos.difference = numberRounding(pos.amountEnd * pos.priceEnd - pos.amountStart * pos.priceStart); // buy close is positive for gain, negative for loss
+    console.log('closing ' + positionId + ' BUYING - ' + config.second + ' ' + amount + ' price ' + config.second + ' ' + price + ' effective amount: ' + pos.effectiveAmount)
+    pos.status = 'close'
+
+    pos.amountEnd = amount
+    pos.priceEnd = price
+
+    pos.difference = numberRounding(pos.amountEnd / pos.priceEnd - pos.amountStart) // buy close is positive for gain, negative for loss
+    pos.asset = config.first; // this is closing transaction for buy position. Difference is shown in second asset
     data.PnL.set(positionId, pos)
-    data.assets.firstMustKeepToClosePositions -= firstChange
+    data.assets.secondMustKeepToClosePositions -= pos.effectiveAmount
   }
   else {
-    let pos = new position('buy', amount, price, 0, 0, config.first )
+    console.log('new position, BUYING - ' + config.second + ' ' + amount + ' price ' + config.second + ' ' + price + ' effective amount: ' + firstChange)
+    let pos = new position('buy', amount, price, 0, 0, config.second ) //diff is shown in USD
+    pos.effectiveAmount = firstChange
     data.PnL.set(Math.random().toString(36).substr(2, 9), pos)
-    console.log('seeting new pnl')
     data.assets.firstMustKeepToClosePositions += firstChange
   }
 }
 var sellFor = function(amount, price, positionId) { // amount is in first asset (BTC)
-  console.log('selling '+ config.first + ' ' + amount + ' price ' + config.second + ' ' + price)
   let secondChange = numberRounding(amount * price)
   data.assets.first -= amount // no exchange fee calculus
   data.assets.second += secondChange
   if (positionId) {
     let pos = data.PnL.get(positionId)
+    console.log('closing ' + positionId + ' SELLING -'+ config.first + ' ' + amount + ' price ' + config.second + ' ' + price + ' effective amount: ' + pos.effectiveAmount)
     pos.status = 'close';
+
     pos.amountEnd = amount;
     pos.priceEnd = price;
-    pos.difference = numberRounding(pos.amountEnd * pos.priceEnd - pos.amountStart * pos.priceStart); // sell close is positive for gain, negative for loss
+
+    pos.difference = numberRounding(pos.amountEnd * pos.priceEnd - pos.amountStart) // 
+    pos.asset = config.second; // this is closing transaction for buy position. Difference is shown in second asset
     data.PnL.set(positionId, pos)
-    data.assets.secondMustKeepToClosePositions -= secondChange
+    data.assets.firstMustKeepToClosePositions -= pos.effectiveAmount
   }
   else {
-    let pos = new position('sell', amount, price, 0, 0, config.first )
+    console.log('new position, SELLING -'+ config.first + ' ' + amount + ' price ' + config.second + ' ' + price + ' effective amount: ' + secondChange)
+    let pos = new position('sell', amount, price, 0, 0, config.first ) //diff is shown in BTC
+    pos.effectiveAmount = secondChange;
     data.PnL.set(Math.random().toString(36).substr(2, 9), pos)
-    console.log('seeting new pnl')
     data.assets.secondMustKeepToClosePositions += secondChange
   }
 }

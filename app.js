@@ -23,11 +23,11 @@ app.use('/status', function(req, res) {
     <th>index</th>
     <th>status</th>
     <th>started as</th>
-    <th>qty start</th>
+    <th>amount start</th>
     <th>price start</th>
-    <th>qty end</th>
+    <th>effective amount</th>
+    <th>amount end</th>
     <th>price end</th>
-    <th>token</th>
     <th>difference</th>
     `
   data.PnL.forEach((item, index) => {
@@ -37,10 +37,10 @@ app.use('/status', function(req, res) {
     <td>${item.type} </td>
     <td>${item.amountStart} </td>
     <td>${item.priceStart} </td>
+    <td>${item.effectiveAmount} </td>
     <td>${item.amountEnd} </td>
     <td>${item.priceEnd} </td>
-    <td>${item.asset} </td>
-    <td>${item.difference} </td>
+    <td>${item.difference} ${item.asset}</td>
     </tr>
     `
   })
@@ -50,11 +50,39 @@ app.use('/status', function(req, res) {
 })
 app.use('/stop', function(req, res) {
   tradingService.stop()
-  res.status(200).send({
-    statusMessage: 'bot activites stopped',
-    assets: data.assets,
-    PnL: JSON.stringify([...data.PnL])
+  let result = `
+    <span> ${cfg.first} : ${data.assets.first} </span> </br>
+    <span> ${cfg.second} : ${data.assets.second} </span> </br>
+    <span> ${cfg.first} to keep : ${data.assets.firstMustKeepToClosePositions} </span> </br>
+    <span> ${cfg.second} to keep: ${data.assets.secondMustKeepToClosePositions} </span> </br> </br>
+    <table border='1' style='text-align: right'>
+    <th>index</th>
+    <th>status</th>
+    <th>started as</th>
+    <th>amount start</th>
+    <th>price start</th>
+    <th>effective amount</th>
+    <th>amount end</th>
+    <th>price end</th>
+    <th>difference</th>
+    `
+  data.PnL.forEach((item, index) => {
+    result += `<tr>
+    <td>${index} </td>
+    <td>${item.status} </td>
+    <td>${item.type} </td>
+    <td>${item.amountStart} </td>
+    <td>${item.priceStart} </td>
+    <td>${item.effectiveAmount} </td>
+    <td>${item.amountEnd} </td>
+    <td>${item.priceEnd} </td>
+    <td>${item.difference} ${item.asset}</td>
+    </tr>
+    `
   })
+  result += `</table`;
+
+  res.status(200).send(result);
 })
 
 
