@@ -26,13 +26,13 @@ var checkOpenPositions = function() {
     data.PnL.forEach((item, index) => {
       if (item.status === 'open') { //optimize by having 2 different position maps, 1st for opened and 2nd for closed positions 
         if (item.type === 'buy') {
-          console.log(`checking ${index} buy position if there is gain if we sell now ${data.latestResult.bidPrice - item.priceStart}`)
+          console.log(`checking buy position (${index})..difference if we close(sell) now ${data.latestResult.bidPrice - item.priceStart}`)
           if ((data.latestResult.bidPrice - item.priceStart) >= config.buyGainStop) {
             sellFor(item.effectiveAmount, data.latestResult.bidPrice, index);
           }
         }
         else { // sell position
-          console.log(`checking ${index} sell position if there is gain if we buy now ${item.priceStart - data.latestResult.askPrice}`)
+          console.log(`checking sell position (${index})..difference if we close(buy) now ${item.priceStart - data.latestResult.askPrice}`)
           if ((item.priceStart - data.latestResult.askPrice) >= config.sellGainStop) {
             buyFor(item.effectiveAmount, data.latestResult.askPrice, index);
           }
